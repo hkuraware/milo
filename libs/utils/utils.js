@@ -218,9 +218,9 @@ export function getLanguage(languages, locales, pathname = window.location.pathn
   const language = languages[languageString];
   if (language && region && language.regions) {
     const [matchingRegion] = language.regions.filter((r) => r.region === region);
-    language.region = matchingRegion.region;
-    if (matchingRegion.ietf)language.ietf = matchingRegion.ietf;
-    if (matchingRegion.tk) language.tk = matchingRegion.tk;
+    if (matchingRegion?.region) language.region = matchingRegion.region;
+    if (matchingRegion?.ietf) language.ietf = matchingRegion.ietf;
+    if (matchingRegion?.tk) language.tk = matchingRegion.tk;
     regionPath = matchingRegion ? `/${region}` : '';
   }
 
@@ -228,7 +228,13 @@ export function getLanguage(languages, locales, pathname = window.location.pathn
       || (language.languageBased === false && !language.region);
   if (isLegacyLocaleRoutingMode) {
     const locale = getLocale(locales, pathname);
-    if (locale.prefix === '') locale.language = DEFAULT_LANG;
+    const englishLang = languages.en;
+    if (locale.prefix === '' && englishLang) {
+      locale.language = DEFAULT_LANG;
+      if (englishLang.region) locale.region = englishLang.region;
+      if (englishLang.ietf) locale.ietf = englishLang.ietf;
+      if (englishLang.tk) locale.tk = englishLang.tk;
+    }
     return locale;
   }
 
@@ -453,6 +459,20 @@ function getPrefixBySite(locale, url, relative) {
   return prefix;
 }
 
+function isLocalizedPath(path, locales) {
+  const langstorePath = path.startsWith(`/${LANGSTORE}`);
+  const previewPath = path.startsWith(`/${PREVIEW}`);
+  const anyTypeOfLocaleOrLanguagePath = localeToLanguageMap
+    && (localeToLanguageMap.some((l) => l.locale !== '' && (path.startsWith(`/${l.locale}/`) || path === `/${l.locale}`))
+      || (localeToLanguageMap.some((l) => path.startsWith(`/${l.langaugePath}/`) || path === `/${l.langaugePath}`)));
+  const legacyLocalePath = locales && Object.keys(locales).some((loc) => loc !== '' && (path.startsWith(`/${loc}/`)
+    || path.endsWith(`/${loc}`)));
+  return langstorePath
+    || previewPath
+    || anyTypeOfLocaleOrLanguagePath
+    || legacyLocalePath;
+}
+
 export function localizeLink(
   href,
   originHostName = window.location.hostname,
@@ -473,11 +493,7 @@ export function localizeLink(
     const isLocalizable = relative || (prodDomains && prodDomains.includes(url.hostname))
       || overrideDomain;
     if (!isLocalizable) return processedHref;
-    const isLocalizedLink = path.startsWith(`/${LANGSTORE}`)
-      || path.startsWith(`/${PREVIEW}`)
-      || (languages && Object.keys(languages).some((lang) => lang !== '' && (path.startsWith(`/${lang}/`))))
-      || (locales && Object.keys(locales).some((loc) => loc !== '' && (path.startsWith(`/${loc}/`)
-        || path.endsWith(`/${loc}`))));
+    const isLocalizedLink = isLocalizedPath(path, locales);
     if (isLocalizedLink) return processedHref;
 
     const prefix = getPrefixBySite(locale, url, relative);
@@ -715,7 +731,7 @@ export function decorateImageLinks(el) {
     const [source, alt, icon] = img.alt.split('|');
     try {
       const url = new URL(source.trim());
-      const href = url.hostname.includes(`.${SLD}.`) ? `${url.pathname}${url.hash}` : url.href;
+      const href = (url.hostname.includes('.aem.') || url.hostname.includes('.hlx.')) ? `${url.pathname}${url.search}${url.hash}` : url.href;
       if (alt?.trim().length) img.alt = alt.trim();
       const pic = img.closest('picture');
       const picParent = pic.parentElement;
@@ -1298,6 +1314,8 @@ async function checkForPageMods() {
     martech,
   } = Object.fromEntries(PAGE_URL.searchParams);
   let targetInteractionPromise = null;
+  let countryIPPromise = null;
+
   let calculatedTimeout = null;
   if (mepParam === 'off') return;
   const pzn = getMepEnablement('personalization');
@@ -1305,12 +1323,20 @@ async function checkForPageMods() {
   const target = martech === 'off' ? false : getMepEnablement('target');
   const xlg = martech === 'off' ? false : getMepEnablement('xlg');
   const ajo = martech === 'off' ? false : getMepEnablement('ajo');
+  const mepgeolocation = martech === 'off' ? false : getMepEnablement('mepgeolocation');
 
   if (!(pzn || target || promo || mepParam
     || mepHighlight || mepButton || mepParam === '' || xlg || ajo)) return;
 
+  if (mepgeolocation) {
+    const urlParams = new URLSearchParams(window.location.search);
+    const akamaiCode = urlParams.get('akamaiLocale')?.toLowerCase() || sessionStorage.getItem('akamai');
+    if (!akamaiCode) {
+      const { getAkamaiCode } = await import('../features/georoutingv2/georoutingv2.js');
+      countryIPPromise = getAkamaiCode(true);
+    }
+  }
   const enablePersV2 = enablePersonalizationV2();
-  const hybridPersEnabled = getMepEnablement('hybrid-pers');
   if ((target || xlg) && enablePersV2) {
     const params = new URL(window.location.href).searchParams;
     calculatedTimeout = parseInt(params.get('target-timeout'), 10)
@@ -1323,7 +1349,7 @@ async function checkForPageMods() {
       const now = performance.now();
       performance.mark('interaction-start');
       const data = await loadAnalyticsAndInteractionData(
-        { locale, env: getEnv({})?.name, calculatedTimeout, hybridPersEnabled },
+        { locale, env: getEnv({})?.name, calculatedTimeout },
       );
       performance.mark('interaction-end');
       performance.measure('total-time', 'interaction-start', 'interaction-end');
@@ -1350,10 +1376,11 @@ async function checkForPageMods() {
     promo,
     target,
     ajo,
+    countryIPPromise,
+    mepgeolocation,
     targetInteractionPromise,
     calculatedTimeout,
     enablePersV2,
-    hybridPersEnabled,
   });
 }
 
@@ -1392,6 +1419,12 @@ async function loadPostLCP(config) {
     import('../features/personalization/personalization.js')
       .then(({ addMepAnalytics }) => addMepAnalytics(config, header));
   }
+  // load privacy here if quick-link is present in first section
+  const quickLink = document.querySelector('div.section')?.querySelector('.quick-link');
+  if (!quickLink) return;
+  import('../scripts/delayed.js').then(({ loadPrivacy }) => {
+    loadPrivacy(getConfig, loadScript);
+  });
 }
 
 export function scrollToHashedElement(hash) {
