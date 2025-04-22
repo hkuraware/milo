@@ -78,7 +78,7 @@ const decorateLinkGroup = (elem, index) => {
   const linkGroup = toFragment`<a
     href="${link.href}"
     class="feds-navLink${modifierClasses.length ? ` ${modifierClasses.join(' ')}` : ''}"
-    daa-ll="${getAnalyticsValue(link.textContent, index)}">
+    daa-ll="${getAnalyticsValue(link.textContent, index)}" role="listitem">
       ${imageElem}
       ${contentElem}
     </a>`;
@@ -244,7 +244,7 @@ const decorateColumns = async ({ content, separatorTagName = 'H5' } = {}) => {
         // Analysts requested no headings in the dropdowns,
         // turning it into a simple div
         const sectionHeadline = decorateHeadline(columnElem, headlineIndex);
-        menuItems = toFragment`<div class="feds-menu-items" daa-lh="${getAnalyticsValue(sectionHeadline.textContent.trim())}"></div>`;
+        menuItems = toFragment`<div class="feds-menu-items" daa-lh="${getAnalyticsValue(sectionHeadline.textContent.trim())}" role="list"></div>`;
 
         itemDestination.append(sectionHeadline, menuItems);
 
