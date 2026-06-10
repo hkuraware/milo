@@ -192,7 +192,8 @@ describe('Modals', () => {
     await waitForElement('#title');
     const modal = document.getElementById('title');
     expect(modal).to.exist;
-    expect(modal.getAttribute('aria-labelledby')).to.equal('test-title');
+    expect(modal.getAttribute('aria-labelledby')).to.equal('test-title feature-title');
+    expect(modal.getAttribute('aria-describedby')).to.equal('modal-desc');
     expect(modal.hasAttribute('aria-label')).to.be.false;
     expect(document.querySelector('#test-title')?.hasAttribute('tabindex')).to.be.false;
     expect(document.activeElement.classList.contains('dialog-close')).to.be.true;

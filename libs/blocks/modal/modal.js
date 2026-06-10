@@ -277,6 +277,42 @@ export async function getModal(details, custom) {
   decorateSectionAnalytics(dialog, `${id}-modal`, getConfig());
   dialog.prepend(close);
   dialog.append(focusPlaceholder);
+
+  if (!dialog.querySelector('iframe')) {
+    const headings = [...dialog.querySelectorAll('h1, h2, h3, h4, h5, h6')];
+    const h2 = dialog.querySelector('h2');
+    const toId = (el, suffix) => {
+      if (!el.id) el.id = `${dialog.id}-modal-${suffix}`;
+      return el.id;
+    };
+    const labelIds = [];
+    if (h2) {
+      const productHeading = headings.find(
+        (h) => h !== h2 && (h.compareDocumentPosition(h2) & Node.DOCUMENT_POSITION_FOLLOWING),
+      );
+      if (productHeading) labelIds.push(toId(productHeading, 'label'));
+      else {
+        const product = [...dialog.querySelectorAll('p:not(.icon-area)')].find(
+          (p) => p.textContent.trim()
+            && (p.compareDocumentPosition(h2) & Node.DOCUMENT_POSITION_FOLLOWING),
+        );
+        if (product) labelIds.push(toId(product, 'label'));
+      }
+      labelIds.push(toId(h2, 'title'));
+      const desc = [...dialog.querySelectorAll('p:not(.icon-area)')].find(
+        (p) => p.textContent.trim()
+          && (p.compareDocumentPosition(h2) & Node.DOCUMENT_POSITION_PRECEDING),
+      );
+      if (desc) dialog.setAttribute('aria-describedby', toId(desc, 'desc'));
+    } else if (headings[0]) {
+      labelIds.push(toId(headings[0], 'title'));
+    }
+    if (labelIds.length) {
+      dialog.removeAttribute('aria-label');
+      dialog.setAttribute('aria-labelledby', labelIds.join(' '));
+    }
+  }
+
   document.body.append(dialog);
   dialogLoadingSet.delete(id);
   firstFocusable?.focus({ preventScroll: true, ...focusVisible });
@@ -342,17 +378,6 @@ export async function getModal(details, custom) {
       iframe.style.height = '100%';
     }
     if (!custom?.closeEvent) dialog.addEventListener('iframe:modal:closed', () => closeModal(dialog));
-  } else {
-    const headings = [...dialog.querySelectorAll('h1, h2, h3, h4, h5, h6')];
-    const h2 = dialog.querySelector('h2');
-    const labels = h2 && headings[0] !== h2 ? [headings[0], h2] : headings.slice(0, 1);
-    if (labels.length) {
-      dialog.removeAttribute('aria-label');
-      dialog.setAttribute('aria-labelledby', labels.map((el, i) => {
-        if (!el.id) el.id = `${dialog.id}-modal-label${i || ''}`;
-        return el.id;
-      }).join(' '));
-    }
   }
 
   return dialog;
