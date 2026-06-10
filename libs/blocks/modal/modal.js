@@ -343,8 +343,16 @@ export async function getModal(details, custom) {
     }
     if (!custom?.closeEvent) dialog.addEventListener('iframe:modal:closed', () => closeModal(dialog));
   } else {
-    const firstHeading = dialog.querySelector('h1, h2, h3, h4, h5, h6');
-    if (firstHeading) dialog.setAttribute('aria-label', firstHeading.textContent.trim());
+    const headings = [...dialog.querySelectorAll('h1, h2, h3, h4, h5, h6')];
+    const h2 = dialog.querySelector('h2');
+    const labels = h2 && headings[0] !== h2 ? [headings[0], h2] : headings.slice(0, 1);
+    if (labels.length) {
+      dialog.removeAttribute('aria-label');
+      dialog.setAttribute('aria-labelledby', labels.map((el, i) => {
+        if (!el.id) el.id = `${dialog.id}-modal-label${i || ''}`;
+        return el.id;
+      }).join(' '));
+    }
   }
 
   return dialog;

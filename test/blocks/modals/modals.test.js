@@ -190,7 +190,10 @@ describe('Modals', () => {
     window.location.hash = '#title';
     await delay(200);
     await waitForElement('#title');
-    expect(document.getElementById('title')).to.exist;
+    const modal = document.getElementById('title');
+    expect(modal).to.exist;
+    expect(modal.getAttribute('aria-labelledby')).to.equal('test-title');
+    expect(modal.hasAttribute('aria-label')).to.be.false;
     expect(document.querySelector('#test-title')?.hasAttribute('tabindex')).to.be.false;
     expect(document.activeElement.classList.contains('dialog-close')).to.be.true;
     window.location.hash = '';
