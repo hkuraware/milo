@@ -232,6 +232,7 @@ export async function getModal(details, custom) {
   const analyticsEventName = window.location.hash ? window.location.hash.replace('#', '') : localeModal;
   const close = createTag('button', {
     class: 'dialog-close',
+    type: 'button',
     'aria-label': 'Close',
     'daa-ll': `${analyticsEventName}:modalClose:buttonClose`,
   }, CLOSE_ICON);
@@ -250,6 +251,11 @@ export async function getModal(details, custom) {
   let shiftTabOnClose = false;
 
   close.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      closeModal(dialog);
+      return;
+    }
     if (event.key !== 'Tab' || !event.shiftKey) return;
     shiftTabOnClose = true;
     focusPlaceholder.focus(focusVisible);

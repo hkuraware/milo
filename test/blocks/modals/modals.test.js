@@ -75,6 +75,21 @@ describe('Modals', () => {
     expect(document.getElementById('milo')).not.to.exist;
   });
 
+  it('Closes a modal when Enter is pressed on the close button', async () => {
+    window.location.hash = '#paragraph';
+    const meta = document.createElement('meta');
+    meta.name = '-paragraph';
+    meta.content = 'http://localhost:2000/test/blocks/modals/mocks/paragraph';
+    document.head.append(meta);
+    await waitForElement('#paragraph');
+    await delay(100);
+    expect(document.activeElement.classList.contains('dialog-close')).to.be.true;
+    await sendKeys({ press: 'Enter' });
+    await waitForRemoval('#paragraph');
+    expect(document.getElementById('paragraph')).not.to.exist;
+    window.location.hash = '';
+  });
+
   it('Closes a modal on manual hash change', async () => {
     window.location.hash = '#milo';
     await waitForElement('#milo');
